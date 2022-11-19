@@ -1,11 +1,13 @@
 [tool.poetry]
 name = "farmworld"
-version = "0.0.1"
+version = "0.0.2"
 description = "Reinforcement Learning for Agriculture"
 authors = ["Tom Grek <tom.grek@gmail.com>"]
 keywords = ["reinforcement", "machine", "learning", "farming", "agriculture"]
 packages = [{include = "farmworld"}]
 readme = "README.md"
+homepage = "https://github.com/tomgrek/farmworld"
+repository = "https://github.com/tomgrek/farmworld"
 
 [tool.poetry.dependencies]
 python = "^3.8"

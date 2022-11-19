@@ -2,3 +2,4 @@
 .venv
 proto
 **/__pycache__
+dist/
