@@ -48,7 +48,9 @@ if __name__ == "__main__":
     import time
 
     obs = env.reset()
-    max_its = 10000; its = 0; info = {}
+    max_its = 10000
+    its = 0
+    info = {}
     while not info.get("successfully_harvested", False) and its < max_its:
         its += 1
         now = time.time()

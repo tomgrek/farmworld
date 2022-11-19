@@ -113,7 +113,7 @@ class CustomEnv(gym.Env):
             self.plant_date = self.day_of_year
 
         if self.day_of_year == 100:
-            reward = -1#self.crop_height_at_harvest
+            reward = -1  # self.crop_height_at_harvest
             done = True
             if reward > 1:
                 print(f"DIDIT********************************{reward}")
@@ -196,7 +196,7 @@ class CustomEnv(gym.Env):
             info += [f"Harvest Day: {self.harvest_date} Yield: {round(self.crop_height_at_harvest, 3)}"]
         for i, text in enumerate(info):
             bitmap = self.font.render(text, True, (0, 0, 0))
-            bg.blit(bitmap, (0, i*18))
+            bg.blit(bitmap, (0, i * 18))
 
         self.screen.blit(bg, (0, 0))
         pygame.display.flip()
