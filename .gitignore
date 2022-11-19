@@ -1,0 +1,4 @@
+**/*.bin
+.venv
+proto
+**/__pycache__

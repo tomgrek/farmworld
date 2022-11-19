@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "farmworld"
+version = "0.0.1"
+description = "Reinforcement Learning for Agriculture"
+authors = ["Tom Grek <tom.grek@gmail.com>"]
+keywords = ["reinforcement", "machine", "learning", "farming", "agriculture"]
+packages = [{include = "farmworld"}]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.8"
+black = "^22.10.0"
+polygenerator = "^0.2.0"
+torch = "^1.13.0"
+stable-baselines3 = {extras = ["extra"], version = "^1.6.2"}
+gym = "0.21.0"
+pygame = "^2.1.2"
+
+[tool.black]
+line-length = 160
+target-version = ['py38']
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
