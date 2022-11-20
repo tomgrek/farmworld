@@ -18,7 +18,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(f"Running with following CLI options: {args}")
 
-    env = farmworld.env.CustomEnv()
+    env = farmworld.env.CustomEnv(geojson="example2.json", screen_size=(700, 700))
 
     set_random_seed(42)
 

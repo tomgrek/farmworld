@@ -1,3 +1,4 @@
+import math
 import random
 
 import gym
@@ -24,8 +25,11 @@ class CustomEnv(gym.Env):
     covered_area = None
     font = None
 
-    def __init__(self):
+    def __init__(self, geojson=None, screen_size=(500, 500)):
         super(CustomEnv, self).__init__()
+
+        self.geojson = geojson
+        self.screen_size = screen_size
 
         # do nothing, plant, or harvest (0, 1, 2)
         self.action_space = spaces.Discrete(3)
@@ -149,37 +153,31 @@ class CustomEnv(gym.Env):
         observation = {"planted": int(self.planted), "harvested": int(self.harvested), "field_center": field_center, "continuous": observation}
         return observation
 
-    def render(self, mode="human"):
+    def render(self, mode="human", font_size=16):
         if self.screen is None:
             pygame.init()
             if self.font is None:
-                self.font = pygame.font.SysFont("dejavusans", 18)
-            self.screen = pygame.display.set_mode([500, 500])
-            geojson = farmworld.geojson.get_geojson("example2.json")
-            self.coords = farmworld.geojson.poly_from_geojson(geojson)
+                self.font = pygame.font.SysFont("dejavusans", font_size)
+            self.screen = pygame.display.set_mode(self.screen_size)
+            geojson = farmworld.geojson.get_geojson(self.geojson)
+            self.coords = farmworld.geojson.poly_from_geojson(geojson, self.screen_size)
 
-        bg = pygame.Surface((500, 500), pygame.SRCALPHA)
+        bg = pygame.Surface(self.screen_size, pygame.SRCALPHA)
         bg.fill((190, 200, 255))
 
-        fg = pygame.Surface((500, 500), pygame.SRCALPHA).convert_alpha()
+        fg = pygame.Surface(self.screen_size, pygame.SRCALPHA).convert_alpha()
         fg.fill((0, 0, 0, 0))
 
         pygame.draw.polygon(bg, (100, 90, 70), self.coords)
 
         if self.covered_area is None:
-            buf = bg.get_buffer().raw
-            bgcol = 0
-            for px in range(0, len(buf), 4):
-                b, g, r, a = buf[px : px + 4]
-                if (r, g, b) == (190, 200, 255):
-                    bgcol += 1
-            self.covered_area = ((500 * 500) - bgcol) / (500 * 500)
+            self.covered_area = farmworld.geojson.util.get_covered_area(bg, (190, 200, 255), self.screen_size)
 
         if self.plants is None:
             poly = matplotlib.path.Path(self.coords)
             self.plants = []
-            while len(self.plants) < (500 * 500 * self.covered_area * 0.1) * 0.1:
-                x, y = random.randint(0, 500), random.randint(0, 500)
+            while len(self.plants) < (math.prod(self.screen_size) * self.covered_area * 0.1) * 0.1:
+                x, y = random.randint(0, self.screen_size[0]), random.randint(0, self.screen_size[1])
                 if poly.contains_point((x, y)):
                     self.plants.append((x, y))
 
@@ -196,7 +194,7 @@ class CustomEnv(gym.Env):
             info += [f"Harvest Day: {self.harvest_date} Yield: {round(self.crop_height_at_harvest, 3)}"]
         for i, text in enumerate(info):
             bitmap = self.font.render(text, True, (0, 0, 0))
-            bg.blit(bitmap, (0, i * 18))
+            bg.blit(bitmap, (0, i * font_size))
 
         self.screen.blit(bg, (0, 0))
         pygame.display.flip()

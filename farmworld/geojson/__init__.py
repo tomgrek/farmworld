@@ -2,6 +2,7 @@ import json
 
 import polygenerator
 
+import farmworld.geojson.util as util
 
 def get_geojson(name=None):
     if name:
@@ -16,7 +17,7 @@ def get_geojson(name=None):
     return geojson
 
 
-def poly_from_geojson(geojson, scale_x=500, scale_y=500):
+def poly_from_geojson(geojson, screen_size):
     for feature in geojson["features"]:
         if feature.get("geometry", {}).get("type", "") == "Polygon":
             coords = feature["geometry"]["coordinates"][0]
@@ -59,7 +60,7 @@ def poly_from_geojson(geojson, scale_x=500, scale_y=500):
     ymin, ymax = abs(ymin), abs(ymax)
 
     newcoords = []
-    sfx, sfy = scale_x / xmax, scale_y / ymax
+    sfx, sfy = screen_size[0] / xmax, screen_size[1] / ymax
     for x, y in coords:
         newcoords.append([x * sfx, y * sfy])
     return newcoords
