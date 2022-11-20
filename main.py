@@ -39,7 +39,16 @@ if __name__ == "__main__":
     if not args.no_resume:
         print(f"Loading policy from {args.filename}")
         model.policy = torch.load(args.filename)
-    model.learn(total_timesteps=args.steps)
+    
+    def logger(accum, other):
+        for info in accum.get("infos", []):
+            if info.get("success", False):
+                print(info)
+                for k, v in info.get("log_data", {}).items():
+                    print(f"{k}: {v}")
+                print("-------")
+
+    model.learn(total_timesteps=args.steps, callback=logger)
     if not args.no_save:
         print(f"Saved policy to {args.filename}")
         torch.save(model.policy, args.filename)

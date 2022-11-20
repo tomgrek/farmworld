@@ -40,7 +40,7 @@ class CustomEnv(gym.Env):
             {
                 "planted": spaces.Discrete(2),
                 "harvested": spaces.Discrete(2),
-                "field_center": spaces.Box(low=-50, high=50, shape=(2,), dtype=np.float32),
+                "farm_center": spaces.Box(low=-50, high=50, shape=(2,), dtype=np.float32),
                 "continuous": spaces.Box(low=0, high=100, shape=(2,), dtype=np.float32),
             }
         )
@@ -53,19 +53,28 @@ class CustomEnv(gym.Env):
         self.crop_height_at_harvest = 0.0
         self.day_of_year = 0  # jan 1st
 
-        self.field_center_x = (random.random() - 0.5) * 100
-        self.field_center_y = (random.random() - 0.5) * 100
+        self.farm_center_x = (random.random() - 0.5) * 100
+        self.farm_center_y = (random.random() - 0.5) * 100
 
         check_env(self)
 
     def gameover(self):
         observation = [float(self.day_of_year), float(self.crop_height)]
         observation = np.array(observation, dtype=np.float32)
-        field_center = [float(self.field_center_x), float(self.field_center_y)]
-        field_center = np.array(field_center, dtype=np.float32)
-        return {"planted": int(self.planted), "harvested": int(self.harvested), "field_center": field_center, "continuous": observation}, 0.0, True, {}
+        farm_center = [float(self.farm_center_x), float(self.farm_center_y)]
+        farm_center = np.array(farm_center, dtype=np.float32)
+        return {"planted": int(self.planted), "harvested": int(self.harvested), "farm_center": farm_center, "continuous": observation}, 0.0, True, {}
+
+    def print_success(self, reward):
+        return {"success": True, "log_data": {
+                    "message": f"HARVESTED HERE ********************************{reward}",
+                    "plant_and_harvest": f"Planted on {self.plant_date} and harvested on {self.harvest_date}",
+                    "other": [[float(self.planted), float(self.harvested), float(self.day_of_year), float(self.crop_height_at_harvest)]]
+                    }
+                }
 
     def step(self, action):
+        info = {}
 
         if action == 1 and self.planted:
             return self.gameover()
@@ -97,17 +106,13 @@ class CustomEnv(gym.Env):
             # self.planted = False
             observation = [float(self.day_of_year), float(self.crop_height)]
             observation = np.array(observation, dtype=np.float32)
-            field_center = [float(self.field_center_x), float(self.field_center_y)]
-            field_center = np.array(field_center, dtype=np.float32)
-            observation = {"planted": int(self.planted), "harvested": int(self.harvested), "field_center": field_center, "continuous": observation}
+            farm_center = [float(self.farm_center_x), float(self.farm_center_y)]
+            farm_center = np.array(farm_center, dtype=np.float32)
+            observation = {"planted": int(self.planted), "harvested": int(self.harvested), "farm_center": farm_center, "continuous": observation}
             reward = self.crop_height_at_harvest
             done = True
-            info = {}
             if reward > 1:
-                print(f"HARVESTED HERE ********************************{reward}")
-                print(f"Planted on {self.plant_date} and harvested on {self.harvest_date}")
-                print([[float(self.planted), float(self.harvested), float(self.day_of_year), float(self.crop_height_at_harvest)]])
-                info = {"successfully_harvested": True}
+                info = self.print_success(reward)
             return observation, float(reward), done, info
 
         if action == 1:
@@ -119,20 +124,16 @@ class CustomEnv(gym.Env):
         if self.day_of_year == 100:
             reward = -1  # self.crop_height_at_harvest
             done = True
-            if reward > 1:
-                print(f"DIDIT********************************{reward}")
-                print(f"Planted on {self.plant_date} and harvested on {self.harvest_date}")
-                print([[float(self.planted), float(self.harvested), float(self.day_of_year), float(self.crop_height_at_harvest)]])
         if action == 0:
             reward = 0.0  # 0.01
 
         observation = [float(self.day_of_year), float(self.crop_height)]
         observation = np.array(observation, dtype=np.float32)
-        field_center = [float(self.field_center_x), float(self.field_center_y)]
-        field_center = np.array(field_center, dtype=np.float32)
-        observation = {"planted": int(self.planted), "harvested": int(self.harvested), "field_center": field_center, "continuous": observation}
+        farm_center = [float(self.farm_center_x), float(self.farm_center_y)]
+        farm_center = np.array(farm_center, dtype=np.float32)
+        observation = {"planted": int(self.planted), "harvested": int(self.harvested), "farm_center": farm_center, "continuous": observation}
 
-        return observation, float(reward), done, {}
+        return observation, float(reward), done, info
 
     def reset(self):
         self.crop_height = 0.0
@@ -143,14 +144,14 @@ class CustomEnv(gym.Env):
         self.harvest_date = 0
         self.day_of_year = 0
 
-        self.field_center_x = (random.random() - 0.5) * 100
-        self.field_center_y = (random.random() - 0.5) * 100
+        self.farm_center_x = (random.random() - 0.5) * 100
+        self.farm_center_y = (random.random() - 0.5) * 100
 
         observation = [float(self.day_of_year), float(self.crop_height)]
         observation = np.array(observation, dtype=np.float32)
-        field_center = [float(self.field_center_x), float(self.field_center_y)]
-        field_center = np.array(field_center, dtype=np.float32)
-        observation = {"planted": int(self.planted), "harvested": int(self.harvested), "field_center": field_center, "continuous": observation}
+        farm_center = [float(self.farm_center_x), float(self.farm_center_y)]
+        farm_center = np.array(farm_center, dtype=np.float32)
+        observation = {"planted": int(self.planted), "harvested": int(self.harvested), "farm_center": farm_center, "continuous": observation}
         return observation
 
     def render(self, mode="human", font_size=16):
