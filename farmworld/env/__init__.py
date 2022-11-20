@@ -13,8 +13,7 @@ import pygame
 import farmworld
 
 
-class CustomEnv(gym.Env):
-    """Custom Environment that follows gym interface"""
+class FarmEnv(gym.Env):
 
     metadata = {"render.modes": ["human"]}
     screen = None
@@ -26,7 +25,7 @@ class CustomEnv(gym.Env):
     font = None
 
     def __init__(self, geojson=None, screen_size=(500, 500)):
-        super(CustomEnv, self).__init__()
+        super(FarmEnv, self).__init__()
 
         self.geojson = geojson
         self.screen_size = screen_size
@@ -160,19 +159,19 @@ class CustomEnv(gym.Env):
             if self.font is None:
                 self.font = pygame.font.SysFont("dejavusans", font_size)
             self.screen = pygame.display.set_mode(self.screen_size)
-            geojson = farmworld.geojson.get_geojson(self.geojson)
+            # TODO this is not right, num_fields should be set in the main init.
+            geojson = farmworld.geojson.get_geojson(self.geojson, num_fields=2)
             self.coords = farmworld.geojson.poly_from_geojson(geojson, self.screen_size)
 
         bg = pygame.Surface(self.screen_size, pygame.SRCALPHA)
-        bg.fill((190, 200, 255))
+        bg.fill(farmworld.const.SKY)
 
         fg = pygame.Surface(self.screen_size, pygame.SRCALPHA).convert_alpha()
-        fg.fill((0, 0, 0, 0))
 
-        pygame.draw.polygon(bg, (100, 90, 70), self.coords)
+        pygame.draw.polygon(bg, farmworld.const.SOIL, self.coords)
 
         if self.covered_area is None:
-            self.covered_area = farmworld.geojson.util.get_covered_area(bg, (190, 200, 255), self.screen_size)
+            self.covered_area = farmworld.geojson.util.get_covered_area(bg, self.screen_size)
 
         if self.plants is None:
             poly = matplotlib.path.Path(self.coords)

@@ -18,7 +18,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
     print(f"Running with following CLI options: {args}")
 
-    env = farmworld.env.CustomEnv(geojson="example2.json", screen_size=(700, 700))
+    env = farmworld.env.FarmEnv(screen_size=(700, 700)) # geojson="example2.json", 
 
     set_random_seed(42)
 
@@ -57,10 +57,10 @@ if __name__ == "__main__":
     import time
 
     obs = env.reset()
-    max_its = 10000
+    max_its = 2000
     its = 0
     info = {}
-    while not info.get("successfully_harvested", False) and its < max_its:
+    while not info.get("success", False) and its < max_its:
         its += 1
         now = time.time()
         action, _states = model.predict(obs, deterministic=True)
