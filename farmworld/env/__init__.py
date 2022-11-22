@@ -10,19 +10,13 @@ from stable_baselines3.common.env_checker import check_env
 import matplotlib
 import pygame
 
-import farmworld
-
+import farmworld.const as const
+from farmworld.geojson import get_geojson, poly_and_scaling_from_geojson, util
+from farmworld.renderer import Renderer
 
 class FarmEnv(gym.Env):
 
     metadata = {"render.modes": ["human"]}
-    screen = None
-    plants = None
-    covered_area = None
-    coords = None
-    plants = None
-    covered_area = None
-    font = None
 
     def __init__(self, geojson=None, num_fields=1, screen_size=(500, 500)):
         super(FarmEnv, self).__init__()
@@ -57,14 +51,11 @@ class FarmEnv(gym.Env):
 
         check_env(self)
 
-        if self.screen is None:
-            pygame.init()
-            if self.font is None:
-                self.font = pygame.font.SysFont("dejavusans", 16)
-            self.screen = pygame.display.set_mode(self.screen_size)
-            geojson = farmworld.geojson.get_geojson(self.geojson, num_fields=num_fields)
-            polys, render_info, self.grid_size, self.cell_size = farmworld.geojson.poly_and_scaling_from_geojson(geojson["features"], self.screen_size)
-            self.fields = [{"render_coords": c, "feature": c_orig, "render_info": r} for c, c_orig, r in zip(polys, geojson["features"], render_info)]
+        geojson = get_geojson(self.geojson, num_fields=num_fields)
+        polys, render_info, self.grid_size, self.cell_size = poly_and_scaling_from_geojson(geojson["features"], self.screen_size)
+        self.fields = [{"render_coords": c, "feature": c_orig, "render_info": r} for c, c_orig, r in zip(polys, geojson["features"], render_info)]
+        
+        self.renderer = Renderer(self.screen_size)
 
     def gameover(self):
         observation = [float(self.day_of_year), float(self.crop_height)]
@@ -165,15 +156,15 @@ class FarmEnv(gym.Env):
     def render(self, mode="human"):
 
         bg = pygame.Surface(self.screen_size, pygame.SRCALPHA)
-        bg.fill(farmworld.const.SKY)
+        bg.fill(const.SKY)
 
         fg = pygame.Surface(self.screen_size, pygame.SRCALPHA).convert_alpha()
         fg.fill((255, 255, 255, 0))
 
         for field in self.fields:
-            pygame.draw.polygon(bg, farmworld.const.SOIL, field["render_coords"])
+            pygame.draw.polygon(bg, const.SOIL, field["render_coords"])
             if not field.get("covered_area", False):
-                field["covered_area"] = farmworld.geojson.util.get_covered_area(bg, self.screen_size)
+                field["covered_area"] = util.get_covered_area(bg, self.screen_size)
             if not field.get("plants", False):
                 poly = matplotlib.path.Path(field["render_coords"])
                 field["plants"] = []
@@ -198,14 +189,10 @@ class FarmEnv(gym.Env):
             info += [f"Plant Day: {self.plant_date}"]
         if self.harvested:
             info += [f"Harvest Day: {self.harvest_date} Yield: {round(self.crop_height_at_harvest, 3)}"]
-        for i, text in enumerate(info):
-            bitmap = self.font.render(text, True, (0, 0, 0))
-            bg.blit(bitmap, (0, i * 16))
+        
+        self.renderer.add_info(bg, info)
 
-        self.screen.blit(bg, (0, 0))
-        pygame.display.flip()
+        self.renderer.show(bg)
 
     def close(self):
-        if self.screen is not None:
-            pygame.display.quit()
-            pygame.quit()
+        self.renderer.quit()

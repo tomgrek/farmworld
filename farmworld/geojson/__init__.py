@@ -3,7 +3,7 @@ import math
 
 import polygenerator
 
-import farmworld.geojson.util as util
+from farmworld.geojson import util
 
 def get_geojson(name=None, num_fields=None):
     if name:

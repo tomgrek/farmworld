@@ -1,3 +1,3 @@
-import farmworld.env
-import farmworld.geojson
-import farmworld.const
+from farmworld import env
+from farmworld import const
+from farmworld import renderer

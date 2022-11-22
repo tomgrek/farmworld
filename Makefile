@@ -9,7 +9,7 @@ venv:
 install:
 	. $(VENV)/bin/activate
 	$(PIP) install poetry
-	$(POETRY) install
+	$(POETRY) install --no-root
 
 tidy:
 	. $(VENV)/bin/activate
