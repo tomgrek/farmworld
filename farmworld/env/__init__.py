@@ -22,7 +22,6 @@ class FarmEnv(gym.Env):
         super(FarmEnv, self).__init__()
 
         self.geojson = geojson
-        self.screen_size = screen_size
 
         # do nothing, plant, or harvest (0, 1, 2)
         self.action_space = spaces.Discrete(3)
@@ -31,7 +30,7 @@ class FarmEnv(gym.Env):
 
         self.observation_space = spaces.Dict(
             {
-                "planted": spaces.Discrete(2),
+                "planted": spaces.Discrete(num_fields, 2),
                 "harvested": spaces.Discrete(2),
                 "farm_center": spaces.Box(low=-50, high=50, shape=(2,), dtype=np.float32),
                 "continuous": spaces.Box(low=0, high=100, shape=(2,), dtype=np.float32),
@@ -52,10 +51,15 @@ class FarmEnv(gym.Env):
         check_env(self)
 
         geojson = get_geojson(self.geojson, num_fields=num_fields)
-        polys, render_info, self.grid_size, self.cell_size = poly_and_scaling_from_geojson(geojson["features"], self.screen_size)
+        polys, render_info, self.grid_size, self.cell_size = poly_and_scaling_from_geojson(geojson["features"], screen_size)
         self.fields = [{"render_coords": c, "feature": c_orig, "render_info": r} for c, c_orig, r in zip(polys, geojson["features"], render_info)]
-        
-        self.renderer = Renderer(self.screen_size)
+
+        self.renderer = Renderer(screen_size)
+        for field in self.fields:
+            bg = pygame.Surface(screen_size, pygame.SRCALPHA)
+            bg.fill(const.SKY)
+            pygame.draw.polygon(bg, const.SOIL, field["render_coords"])
+            field["covered_area"] = util.get_covered_area(bg, screen_size, self.grid_size)
 
     def gameover(self):
         observation = [float(self.day_of_year), float(self.crop_height)]
@@ -154,21 +158,16 @@ class FarmEnv(gym.Env):
         return observation
 
     def render(self, mode="human"):
-
-        bg = pygame.Surface(self.screen_size, pygame.SRCALPHA)
-        bg.fill(const.SKY)
-
-        fg = pygame.Surface(self.screen_size, pygame.SRCALPHA).convert_alpha()
-        fg.fill((255, 255, 255, 0))
+        bg = self.renderer.get_surface(const.SKY)
+        fg = self.renderer.get_surface(const.TRANSPARENT_WHITE)
 
         for field in self.fields:
             pygame.draw.polygon(bg, const.SOIL, field["render_coords"])
-            if not field.get("covered_area", False):
-                field["covered_area"] = util.get_covered_area(bg, self.screen_size)
+            
             if not field.get("plants", False):
                 poly = matplotlib.path.Path(field["render_coords"])
                 field["plants"] = []
-                while len(field["plants"]) < (math.prod(self.screen_size) * field["covered_area"] * 0.1) * 0.1:
+                while len(field["plants"]) < (math.prod(self.renderer.screen_size) * field["covered_area"] * 0.1) * 0.1:
                     x, y = random.randint(field["render_info"]["start_x"], field["render_info"]["end_x"]), random.randint(field["render_info"]["start_y"], field["render_info"]["end_y"])
                     if poly.contains_point((x, y)):
                         field["plants"].append((x, y))
@@ -179,8 +178,8 @@ class FarmEnv(gym.Env):
         
         # draw grid lines
         for cell in range(1, self.grid_size):
-            pygame.draw.line(fg, (0, 0, 0, 128), (cell * self.cell_size[0], 0), (cell * self.cell_size[0], self.screen_size[1]))
-            pygame.draw.line(fg, (0, 0, 0, 128), (0, cell * self.cell_size[1]), (self.screen_size[0], cell * self.cell_size[1]))
+            pygame.draw.line(fg, const.TRANSLUCENT_GREY, (cell * self.cell_size[0], 0), (cell * self.cell_size[0], self.renderer.screen_size[1]))
+            pygame.draw.line(fg, const.TRANSLUCENT_GREY, (0, cell * self.cell_size[1]), (self.renderer.screen_size[0], cell * self.cell_size[1]))
         
         bg.blit(fg, (0, 0), None)
 
