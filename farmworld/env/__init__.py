@@ -1,5 +1,6 @@
 import math
 import random
+import time
 
 import gym
 from gym import spaces
@@ -157,7 +158,9 @@ class FarmEnv(gym.Env):
         observation = {"planted": int(self.planted), "harvested": int(self.harvested), "farm_center": farm_center, "continuous": observation}
         return observation
 
-    def render(self, mode="human"):
+    def render(self, max_fps=None, mode="human"):
+        if max_fps is not None:
+            now = time.time()
         bg = self.renderer.get_surface(const.SKY)
         fg = self.renderer.get_surface(const.TRANSPARENT_WHITE)
 
@@ -192,6 +195,11 @@ class FarmEnv(gym.Env):
         self.renderer.add_info(bg, info)
 
         self.renderer.show(bg)
+
+        if max_fps is not None:
+            time_taken = time.time() - now
+            if time_taken < (1 / max_fps):
+                time.sleep((1 / max_fps) - time_taken)
 
     def close(self):
         self.renderer.quit()
