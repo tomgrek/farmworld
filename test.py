@@ -23,8 +23,8 @@ if __name__ == "__main__":
 
     set_random_seed(42)
 
-    #model = PPO("MultiInputPolicy", env, verbose=1, gamma=0.997)
-    model = RecurrentPPO("MultiInputLstmPolicy", env, verbose=1, gamma=0.998)
+    model = PPO("MultiInputPolicy", env, verbose=1, gamma=0.997)
+    #model = RecurrentPPO("MultiInputLstmPolicy", env, verbose=1, gamma=0.95)
 
     if not args.no_resume:
         print(f"Loading policy from {args.filename}")
