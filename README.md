@@ -19,9 +19,15 @@ make install
 
 Put a new release on Github
 
-```
+```shell
 poetry build
 poetry publish
+```
+
+# Test
+
+```python
+PYTHONPATH=. python test/test_env.py
 ```
 
 # TODO

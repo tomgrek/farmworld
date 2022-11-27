@@ -35,15 +35,16 @@ class FarmEnv(gym.Env):
 
         self.observation_space = spaces.Dict(
             {
-                "harvested": spaces.Box(low=0, high=1, shape=(num_fields, 1), dtype=np.int8),
                 "farm_center": spaces.Box(low=-50, high=50, shape=(2,), dtype=np.float32),
-                "crop_height": spaces.Box(low=0, high=100, shape=(num_fields, 1), dtype=np.float32),
+                "crop_height": spaces.Box(low=-1, high=100, shape=(num_fields,), dtype=np.float32),
                 "day_of_year": spaces.Box(low=0, high=100, shape=(1, ), dtype=np.float32)
             }
         )
 
         self.day_of_year = 0  # jan 1st
+        self.total_rewards = 0.0
         self.inaction_penalty = 0
+        self.num_fields = num_fields
 
         self.farm_center_x = (random.random() - 0.5) * 100
         self.farm_center_y = (random.random() - 0.5) * 100
@@ -53,6 +54,7 @@ class FarmEnv(gym.Env):
         self.fields = [Field(render_coords=c, feature=c_orig, render_info=r) for c, c_orig, r in zip(polys, geojson["features"], render_info)]
 
         check_env(self)
+        self.reset()
 
         self.renderer = Renderer(screen_size)
         for field in self.fields:
@@ -60,8 +62,6 @@ class FarmEnv(gym.Env):
             bg.fill(const.SKY)
             pygame.draw.polygon(bg, const.SOIL, field.render_coords)
             field.covered_area = util.get_covered_area(bg, screen_size, self.grid_size)
-        
-        self.total_rewards = 0.0
     
     @property
     def current_observation(self):
@@ -70,9 +70,8 @@ class FarmEnv(gym.Env):
         farm_center = [float(self.farm_center_x), float(self.farm_center_y)]
         farm_center = np.array(farm_center, dtype=np.float32)
         observation = {
-                "harvested": np.array([[int(field.harvested)] for field in self.fields], dtype=np.int8),
                 "farm_center": farm_center,
-                "crop_height": crop_heights,
+                "crop_height": crop_heights.flatten(),
                 "day_of_year": np.array([float(self.day_of_year)], dtype=np.float32)
                }
         return observation
@@ -80,11 +79,13 @@ class FarmEnv(gym.Env):
     def gameover(self, illegal_move=True):
         rewards = 0.0
         if not illegal_move:
-            rewards = (self.day_of_year / 10000)
+            rewards = (self.day_of_year / 1000)
+        rewards += self.total_rewards
         if self.day_of_year >= 100:
-            rewards += self.total_rewards
+            rewards *= 2
         rewards -= (self.inaction_penalty / 1000)
-        return self.current_observation, rewards, True, {}
+        theoretical_max = (self.num_fields * (100 - 2)) / (self.day_of_year)
+        return self.current_observation, float(rewards / theoretical_max), True, {}
         
     def print_success(self, reward):
         return {"success": True, "log_data": {
@@ -96,17 +97,7 @@ class FarmEnv(gym.Env):
         info = {}
         field, action = self.fields[action[0]], action[1]
 
-        if action == 1 and field.planted:
-            return self.gameover()
-
-        if field.planted:
-            field.crop_height += 1
-            # if 25 < self.day_of_year < 50:
-            #     field.crop_height += 1
-            #     if field.plant_date < 25:
-            #         field.crop_height -= (25 - field.plant_date) * 0.01
-            # if self.day_of_year > 50:
-            #     field.crop_height = max(field.crop_height - 1, 0)
+        field.grow()
 
         self.day_of_year += 1
 
@@ -114,67 +105,52 @@ class FarmEnv(gym.Env):
         done = False
 
         if action == 2:  # harvest
-            if field.harvested or not field.planted:
+            if not field.is_planted:
                 return self.gameover(illegal_move=True)
-            field.harvested = True
-            field.planted = False
-            field.plant_date = -1
-            field.harvest_date = self.day_of_year
-            field.crop_height_at_harvest = field.crop_height
-            field.crop_height = 0
-            self.total_rewards += field.crop_height_at_harvest
-            if field.crop_height_at_harvest > 1:
-                info = self.print_success(field.crop_height_at_harvest)
+            # reward += 0.1 # reward for exploration
+
+            reward_ = field.harvest(self.day_of_year)
+            self.total_rewards += reward_
 
         if action == 1:
-            if field.planted:
+            if field.is_planted:
                 return self.gameover(illegal_move=True)
-            if hasattr(self, "renderer") and self.renderer and not field.planted:
+            #reward += 0.1 # reward for exploration
+            if hasattr(self, "renderer") and self.renderer and not field.is_planted:
                 poly = matplotlib.path.Path(field.render_coords)
                 while len(field.plants) < (math.prod(self.renderer.screen_size) * field.covered_area * 0.1) * 0.1:
                     x, y = random.randint(field.render_info["start_x"], field.render_info["end_x"]), random.randint(field.render_info["start_y"], field.render_info["end_y"])
                     if poly.contains_point((x, y)):
                         field.plants.append((x, y))
-            field.planted = True
-            field.harvested = False
-            field.plant_date = self.day_of_year
+            field.plant(self.day_of_year)
 
         if action == 0:
             self.inaction_penalty += 1
 
         if self.day_of_year >= 100:
-            if self.total_rewards > 0:
-                info = self.print_success(reward)
             return self.gameover(illegal_move=False)
+        
+        # time passes in the background, other fields grow
+        for other_field in self.fields:
+            if other_field == field:
+                continue
+            other_field.grow()
 
         return self.current_observation, float(reward), done, info
 
     def reset(self):
+        if self.total_rewards > 0:
+            self.print_success(self.total_rewards)
         for field in self.fields:
-            field.crop_height = 0.0
-            field.crop_height_at_harvest = 0.0
-            field.planted = False
-            field.plant_date = -1
-            field.plants = []
-            field.harvested = False
-            field.harvest_date = -1
+            field.reset()
         self.day_of_year = 0
         self.total_rewards = 0.0
+        self.inaction_penalty = 0.0
 
         self.farm_center_x = (random.random() - 0.5) * 100
         self.farm_center_y = (random.random() - 0.5) * 100
 
-        crop_heights = [[f.crop_height] for f in self.fields]
-        crop_heights = np.array(crop_heights, dtype=np.float32)
-        farm_center = [float(self.farm_center_x), float(self.farm_center_y)]
-        farm_center = np.array(farm_center, dtype=np.float32)
-        
-        return {
-                "harvested": np.array([[int(field.harvested)] for field in self.fields], dtype=np.int8),
-                "farm_center": farm_center,
-                "crop_height": crop_heights,
-                "day_of_year": np.array([float(self.day_of_year)], dtype=np.float32)
-               }
+        return self.current_observation
 
     def render(self, max_fps=None, mode="human"):
         if max_fps is not None:
@@ -199,8 +175,8 @@ class FarmEnv(gym.Env):
         info = [f"Day: {self.day_of_year}"]
         for field in self.fields:
             info += [f"Height: {round(field.crop_height, 3)}"]
-            info += [f"Planted: {field.planted} Plant Day: {field.plant_date}"]
-            info += [f"Harvested: {field.harvested} Harvest Day: {field.harvest_date} Yield: {round(field.crop_height_at_harvest, 3)}"]
+            #info += [f"Plant Day: {field.plant_date}"]
+            #info += [f"Harvest Day: {field.harvest_date} Yield: {round(field.crop_height_at_harvest, 3)}"]
         info += [f"Total Yield: {self.total_rewards}"]
         self.renderer.add_info(bg, info)
 

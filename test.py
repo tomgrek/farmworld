@@ -23,8 +23,8 @@ if __name__ == "__main__":
 
     set_random_seed(42)
 
-    model = PPO("MultiInputPolicy", env, verbose=1, gamma=0.997)
-    #model = RecurrentPPO("MultiInputLstmPolicy", env, verbose=1, gamma=0.95)
+    #model = PPO("MultiInputPolicy", env, verbose=1, gamma=0.997)
+    model = RecurrentPPO("MultiInputLstmPolicy", env, verbose=1, gamma=0.95)
 
     if not args.no_resume:
         print(f"Loading policy from {args.filename}")
@@ -46,15 +46,15 @@ if __name__ == "__main__":
     # Demo the policy, with rendering
 
     obs = env.reset()
-    max_its = 2000
+    max_its = 20000000
     its = 0
     info = {}
-    done = 1; _states = None
-    while not info.get("success", False) and its < max_its:
+    done = 1; _states = None; reward = -10
+    while its < max_its: # not info.get("success", False) and reward < 2 and 
         its += 1
         action, _states = model.predict(obs, state=_states, episode_start=done, deterministic=True)
         obs, reward, done, info = env.step(action)
-        env.render(max_fps=50)
+        env.render(max_fps=20)
         if done:
             import time; time.sleep(0.2)
             obs = env.reset()
