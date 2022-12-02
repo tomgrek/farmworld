@@ -22,7 +22,12 @@ class Crop: # should be subclassed
         self.height += 1
     
     def reap(self, harvest_date):
+        if self.start_date is None:
+            return 0
+        if harvest_date - self.start_date < 10:
+            return 0
         yield_ = self.height
+        yield_ *= (harvest_date - self.start_date) / 10
         self.height = -1
         return yield_
 
@@ -38,6 +43,7 @@ class Field:
 
     def __init__(self, **kwargs):
         self.id = uuid.uuid4()
+        self.idx = kwargs.get("idx", -1)
         self.plants = []
         for k, v in kwargs.items():
             assert k in self.__class__.__dict__, "Not a field property."

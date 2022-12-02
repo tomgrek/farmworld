@@ -30,11 +30,20 @@ poetry publish
 PYTHONPATH=. python test/test_env.py
 ```
 
+# Current Status
+
+DQN basically solves it after 100k steps.
+
 # TODO
 
-# move plants from just being some random attribute of the field, to a more deliberate
-# planting strategy, ie an action that can be taken. at least have field.plants set only when the agent
-# has done the PLANT action. (mostly done, consider density etc)
-# episode should be DONE when all harvests have taken place (at least in current setup)
-# then, need to add different plants which have different maturities, weather needs etc. 
+* normalize the observations to -1/1. this seems to be having an effect, so continue on to normalize
+the crop heights and yield, and the reward. create a generic fn to do maxscaling.
+* have only 1 zero action
+* then, complicate the problem!
+
+# suspect the tests will fail now
+# make env realistic -- add different plants, no "reward shaping". is the theoretical max accurate -
+# does planting a crop and letting it grow 4 days score better than plant/harvest plant/harvest
+# fix planting density
+# add different plants which have different maturities, weather needs etc. 
 # plus weather forecast, soil quality(split into attributes)

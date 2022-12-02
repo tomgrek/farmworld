@@ -2,8 +2,8 @@ import argparse
 
 import torch
 
-from stable_baselines3 import PPO
-from sb3_contrib import RecurrentPPO
+from stable_baselines3 import PPO, DQN
+from sb3_contrib import RecurrentPPO, TRPO
 from stable_baselines3.common.utils import set_random_seed
 
 import farmworld
@@ -23,8 +23,10 @@ if __name__ == "__main__":
 
     set_random_seed(42)
 
-    #model = PPO("MultiInputPolicy", env, verbose=1, gamma=0.997)
-    model = RecurrentPPO("MultiInputLstmPolicy", env, verbose=1, gamma=0.95)
+    #model = PPO("MultiInputPolicy", env, verbose=1, gamma=0.999, ent_coef=0.1)#0.001)
+    #model = TRPO("MultiInputPolicy", env, verbose=1)
+    #model = RecurrentPPO("MultiInputLstmPolicy", env, verbose=1, gamma=0.95, ent_coef=0.0, learning_rate=0.003)#0.1)
+    model = DQN("MultiInputPolicy", env, learning_starts=10000, gamma=0.995, exploration_fraction=0.5, exploration_initial_eps=0.5, verbose=1)
 
     if not args.no_resume:
         print(f"Loading policy from {args.filename}")
@@ -58,7 +60,5 @@ if __name__ == "__main__":
         if done:
             import time; time.sleep(0.2)
             obs = env.reset()
-
-    # it should plant at 25, harvest day 50 to get the max gain
 
     env.close()

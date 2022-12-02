@@ -29,15 +29,19 @@ class FarmEnv(gym.Env):
 
         # do nothing, plant, or harvest (0, 1, 2)
         # only work on 1 field per day -if you want multiple actions over multiple fields per day, use box.
-        self.action_space = spaces.MultiDiscrete((num_fields, 3))
+        #self.action_space = spaces.MultiDiscrete((num_fields, 3))
+        self.num_actions = 3
+        self.action_space = spaces.Discrete(num_fields * self.num_actions)
+        self.length_of_year = 100
 
         # 1 row that describes whether planted, whether harvested, day of year, crop height
 
         self.observation_space = spaces.Dict(
             {
-                "farm_center": spaces.Box(low=-50, high=50, shape=(2,), dtype=np.float32),
+                "farm_center": spaces.Box(low=-1, high=1, shape=(2,), dtype=np.float32),
                 "crop_height": spaces.Box(low=-1, high=100, shape=(num_fields,), dtype=np.float32),
-                "day_of_year": spaces.Box(low=0, high=100, shape=(1, ), dtype=np.float32)
+                "day_of_year": spaces.Box(low=-1, high=1, shape=(1, ), dtype=np.float32),
+                "current_yield": spaces.Box(low=0, high=1000, shape=(1, ), dtype=np.float32),
             }
         )
 
@@ -46,12 +50,14 @@ class FarmEnv(gym.Env):
         self.inaction_penalty = 0
         self.num_fields = num_fields
 
-        self.farm_center_x = (random.random() - 0.5) * 100
-        self.farm_center_y = (random.random() - 0.5) * 100
+        self.farm_center_x = (random.random() - 0.5) * 2
+        self.farm_center_y = (random.random() - 0.5) * 2
 
         geojson = get_geojson(self.geojson, num_fields=num_fields)
         polys, render_info, self.grid_size, self.cell_size = poly_and_scaling_from_geojson(geojson["features"], screen_size)
         self.fields = [Field(render_coords=c, feature=c_orig, render_info=r) for c, c_orig, r in zip(polys, geojson["features"], render_info)]
+        for i, field in enumerate(self.fields):
+            field.idx = i
 
         check_env(self)
         self.reset()
@@ -72,37 +78,54 @@ class FarmEnv(gym.Env):
         observation = {
                 "farm_center": farm_center,
                 "crop_height": crop_heights.flatten(),
-                "day_of_year": np.array([float(self.day_of_year)], dtype=np.float32)
+                "day_of_year": np.array([(self.day_of_year - (self.length_of_year//2))/(self.length_of_year//2)], dtype=np.float32),
+                "current_yield": np.array([float(self.total_rewards)], dtype=np.float32),
                }
         return observation
 
     def gameover(self, illegal_move=True):
         rewards = 0.0
+        info = {}
+        # if not illegal_move: # seems to encourage boring behavior/slow learning
+        #     rewards = (self.day_of_year / 1000)
         if not illegal_move:
-            rewards = (self.day_of_year / 1000)
-        rewards += self.total_rewards
+            rewards += self.total_rewards
+        else:
+            rewards += self.total_rewards / 10
         if self.day_of_year >= 100:
             rewards *= 2
-        rewards -= (self.inaction_penalty / 1000)
+            info = self.print_success(rewards)
+            info["TimeLimit.truncated"] = True
+            # if self.total_rewards < 1:
+            #     rewards = 0.0
+        # rewards -= (self.inaction_penalty / 1000)
         theoretical_max = (self.num_fields * (100 - 2)) / (self.day_of_year)
-        return self.current_observation, float(rewards / theoretical_max), True, {}
+        rewards = float(rewards / theoretical_max)
+        return self.current_observation, rewards, True, info
         
     def print_success(self, reward):
         return {"success": True, "log_data": {
                     "message": f"HARVESTED HERE ********************************{reward}"
                     }
                 }
+    
+    def deconstruct_action(self, action_):
+        # NEXT: I can cut this down - each field has only 2 actions in reality, plus
+        # a general "zero"/do nothing action. so totally 9 instead of 12.
+        field = int(math.floor(action_ / self.num_actions))
+        action = action_ % self.num_actions
+        field = self.fields[field]
+        # for ppo/with multidiscrete action space, easier: field, action = self.fields[action[0]], action[1]
+        return field, action
 
-    def step(self, action):
+    def step(self, action_):
         info = {}
-        field, action = self.fields[action[0]], action[1]
+        field, action = self.deconstruct_action(action_)
 
-        field.grow()
+        for field_ in self.fields:
+            field_.grow()
 
         self.day_of_year += 1
-
-        reward = 0.0 #self.day_of_year / 1000
-        done = False
 
         if action == 2:  # harvest
             if not field.is_planted:
@@ -129,14 +152,8 @@ class FarmEnv(gym.Env):
 
         if self.day_of_year >= 100:
             return self.gameover(illegal_move=False)
-        
-        # time passes in the background, other fields grow
-        for other_field in self.fields:
-            if other_field == field:
-                continue
-            other_field.grow()
 
-        return self.current_observation, float(reward), done, info
+        return self.current_observation, 0.0, False, info
 
     def reset(self):
         if self.total_rewards > 0:
@@ -147,8 +164,8 @@ class FarmEnv(gym.Env):
         self.total_rewards = 0.0
         self.inaction_penalty = 0.0
 
-        self.farm_center_x = (random.random() - 0.5) * 100
-        self.farm_center_y = (random.random() - 0.5) * 100
+        self.farm_center_x = (random.random() - 0.5) * 2
+        self.farm_center_y = (random.random() - 0.5) * 2
 
         return self.current_observation
 
@@ -160,7 +177,6 @@ class FarmEnv(gym.Env):
 
         for field in self.fields:
             pygame.draw.polygon(bg, const.SOIL, field.render_coords)
-
             for x, y in field.plants:
                 color = (20, 220, 50) if field.crop_height >= 0 else (220, 50, 20)
                 pygame.draw.line(fg, color, start_pos=(x, y - field.crop_height), end_pos=(x, y), width=2)
@@ -173,12 +189,15 @@ class FarmEnv(gym.Env):
         bg.blit(fg, (0, 0), None)
 
         info = [f"Day: {self.day_of_year}"]
+        info += [f"Total Yield: {self.total_rewards}"]
+        self.renderer.add_global_info(bg, info)
+
         for field in self.fields:
-            info += [f"Height: {round(field.crop_height, 3)}"]
+            info = [f"{field.idx}. Height: {round(field.crop_height, 3)}"]
             #info += [f"Plant Day: {field.plant_date}"]
             #info += [f"Harvest Day: {field.harvest_date} Yield: {round(field.crop_height_at_harvest, 3)}"]
-        info += [f"Total Yield: {self.total_rewards}"]
-        self.renderer.add_info(bg, info)
+            self.renderer.add_field_info(bg, field, info)
+        
 
         self.renderer.show(bg)
 
