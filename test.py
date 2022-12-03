@@ -4,6 +4,8 @@ import torch
 
 from stable_baselines3 import PPO, DQN
 from sb3_contrib import RecurrentPPO, TRPO
+from stable_baselines3.common.vec_env.dummy_vec_env import DummyVecEnv
+from stable_baselines3.common.vec_env.vec_normalize import VecNormalize
 from stable_baselines3.common.utils import set_random_seed
 
 import farmworld
@@ -18,15 +20,16 @@ parser.set_defaults(no_resume=False, no_save=False)
 if __name__ == "__main__":
     args = parser.parse_args()
     print(f"Running with following CLI options: {args}")
+    GAMMA = 0.995
 
-    env = farmworld.env.FarmEnv(screen_size=(700, 700), num_fields=4) # geojson="example2.json", 
-
+    env = farmworld.env.FarmEnv(screen_size=(700, 700), num_fields=4, max_fps=40) # geojson="example2.json", 
+    env = VecNormalize(DummyVecEnv([lambda: env]), gamma=GAMMA, clip_reward=1000, clip_obs=1000)
     set_random_seed(42)
 
     #model = PPO("MultiInputPolicy", env, verbose=1, gamma=0.999, ent_coef=0.1)#0.001)
     #model = TRPO("MultiInputPolicy", env, verbose=1)
     #model = RecurrentPPO("MultiInputLstmPolicy", env, verbose=1, gamma=0.95, ent_coef=0.0, learning_rate=0.003)#0.1)
-    model = DQN("MultiInputPolicy", env, learning_starts=10000, gamma=0.995, exploration_fraction=0.5, exploration_initial_eps=0.5, verbose=1)
+    model = DQN("MultiInputPolicy", env, learning_starts=10000, gamma=GAMMA, exploration_fraction=0.5, exploration_initial_eps=0.4, verbose=1)
 
     if not args.no_resume:
         print(f"Loading policy from {args.filename}")
@@ -46,7 +49,7 @@ if __name__ == "__main__":
         torch.save(model.policy, args.filename)
 
     # Demo the policy, with rendering
-
+    env.training = False
     obs = env.reset()
     max_its = 20000000
     its = 0
@@ -56,8 +59,9 @@ if __name__ == "__main__":
         its += 1
         action, _states = model.predict(obs, state=_states, episode_start=done, deterministic=True)
         obs, reward, done, info = env.step(action)
-        env.render(max_fps=20)
+        env.render()
         if done:
+            print(f"{reward}(normd):{env.get_original_reward()}(orig)")
             import time; time.sleep(0.2)
             obs = env.reset()
 

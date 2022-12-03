@@ -34,16 +34,14 @@ PYTHONPATH=. python test/test_env.py
 
 DQN basically solves it after 100k steps.
 
+* Normalized the easy way using vecnormalize.
+* Added a zeroth action and trimmed the action space a bit
+
 # TODO
 
-* normalize the observations to -1/1. this seems to be having an effect, so continue on to normalize
-the crop heights and yield, and the reward. create a generic fn to do maxscaling.
-* have only 1 zero action
-* then, complicate the problem!
+* complicate the problem! multiple crops, and they need to start dieing off at some point
 
-# suspect the tests will fail now
-# make env realistic -- add different plants, no "reward shaping". is the theoretical max accurate -
-# does planting a crop and letting it grow 4 days score better than plant/harvest plant/harvest
+# make env realistic -- add different plants
 # fix planting density
 # add different plants which have different maturities, weather needs etc. 
 # plus weather forecast, soil quality(split into attributes)

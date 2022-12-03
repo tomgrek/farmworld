@@ -22,16 +22,17 @@ class FarmEnv(gym.Env):
 
     metadata = {"render.modes": ["human"]}
 
-    def __init__(self, geojson=None, num_fields=1, screen_size=(500, 500)):
+    def __init__(self, geojson=None, num_fields=1, screen_size=(500, 500), max_fps=50):
         super(FarmEnv, self).__init__()
 
         self.geojson = geojson
+        self.max_fps = max_fps
 
-        # do nothing, plant, or harvest (0, 1, 2)
+        # plant, or harvest (0, 1) + 1 (do nothing on all fields)
         # only work on 1 field per day -if you want multiple actions over multiple fields per day, use box.
         #self.action_space = spaces.MultiDiscrete((num_fields, 3))
-        self.num_actions = 3
-        self.action_space = spaces.Discrete(num_fields * self.num_actions)
+        self.num_actions = 2
+        self.action_space = spaces.Discrete(1 + (num_fields * self.num_actions))
         self.length_of_year = 100
 
         # 1 row that describes whether planted, whether harvested, day of year, crop height
@@ -47,7 +48,6 @@ class FarmEnv(gym.Env):
 
         self.day_of_year = 0  # jan 1st
         self.total_rewards = 0.0
-        self.inaction_penalty = 0
         self.num_fields = num_fields
 
         self.farm_center_x = (random.random() - 0.5) * 2
@@ -78,7 +78,7 @@ class FarmEnv(gym.Env):
         observation = {
                 "farm_center": farm_center,
                 "crop_height": crop_heights.flatten(),
-                "day_of_year": np.array([(self.day_of_year - (self.length_of_year//2))/(self.length_of_year//2)], dtype=np.float32),
+                "day_of_year": np.array([self.day_of_year], dtype=np.float32),
                 "current_yield": np.array([float(self.total_rewards)], dtype=np.float32),
                }
         return observation
@@ -86,8 +86,6 @@ class FarmEnv(gym.Env):
     def gameover(self, illegal_move=True):
         rewards = 0.0
         info = {}
-        # if not illegal_move: # seems to encourage boring behavior/slow learning
-        #     rewards = (self.day_of_year / 1000)
         if not illegal_move:
             rewards += self.total_rewards
         else:
@@ -96,11 +94,6 @@ class FarmEnv(gym.Env):
             rewards *= 2
             info = self.print_success(rewards)
             info["TimeLimit.truncated"] = True
-            # if self.total_rewards < 1:
-            #     rewards = 0.0
-        # rewards -= (self.inaction_penalty / 1000)
-        theoretical_max = (self.num_fields * (100 - 2)) / (self.day_of_year)
-        rewards = float(rewards / theoretical_max)
         return self.current_observation, rewards, True, info
         
     def print_success(self, reward):
@@ -112,6 +105,9 @@ class FarmEnv(gym.Env):
     def deconstruct_action(self, action_):
         # NEXT: I can cut this down - each field has only 2 actions in reality, plus
         # a general "zero"/do nothing action. so totally 9 instead of 12.
+        if action_ == 0:
+            return (None, None)
+        action_ -= 1
         field = int(math.floor(action_ / self.num_actions))
         action = action_ % self.num_actions
         field = self.fields[field]
@@ -119,26 +115,27 @@ class FarmEnv(gym.Env):
         return field, action
 
     def step(self, action_):
-        info = {}
-        field, action = self.deconstruct_action(action_)
-
+        # General actions per timestep
         for field_ in self.fields:
             field_.grow()
-
         self.day_of_year += 1
 
-        if action == 2:  # harvest
+        # Return values
+        info = {}
+
+        # Policy initiated actions
+        field, action = self.deconstruct_action(action_)
+
+        if action == 1:  # harvest
             if not field.is_planted:
                 return self.gameover(illegal_move=True)
-            # reward += 0.1 # reward for exploration
 
             reward_ = field.harvest(self.day_of_year)
             self.total_rewards += reward_
 
-        if action == 1:
+        if action == 0:
             if field.is_planted:
                 return self.gameover(illegal_move=True)
-            #reward += 0.1 # reward for exploration
             if hasattr(self, "renderer") and self.renderer and not field.is_planted:
                 poly = matplotlib.path.Path(field.render_coords)
                 while len(field.plants) < (math.prod(self.renderer.screen_size) * field.covered_area * 0.1) * 0.1:
@@ -146,9 +143,6 @@ class FarmEnv(gym.Env):
                     if poly.contains_point((x, y)):
                         field.plants.append((x, y))
             field.plant(self.day_of_year)
-
-        if action == 0:
-            self.inaction_penalty += 1
 
         if self.day_of_year >= 100:
             return self.gameover(illegal_move=False)
@@ -162,16 +156,14 @@ class FarmEnv(gym.Env):
             field.reset()
         self.day_of_year = 0
         self.total_rewards = 0.0
-        self.inaction_penalty = 0.0
 
         self.farm_center_x = (random.random() - 0.5) * 2
         self.farm_center_y = (random.random() - 0.5) * 2
 
         return self.current_observation
 
-    def render(self, max_fps=None, mode="human"):
-        if max_fps is not None:
-            now = time.time()
+    def render(self, mode="human"):
+        now = time.time()
         bg = self.renderer.get_surface(const.SKY)
         fg = self.renderer.get_surface(const.TRANSPARENT_WHITE)
 
@@ -201,10 +193,9 @@ class FarmEnv(gym.Env):
 
         self.renderer.show(bg)
 
-        if max_fps is not None:
-            time_taken = time.time() - now
-            if time_taken < (1 / max_fps):
-                time.sleep((1 / max_fps) - time_taken)
+        time_taken = time.time() - now
+        if time_taken < (1 / self.max_fps):
+            time.sleep((1 / self.max_fps) - time_taken)
 
     def close(self):
         self.renderer.quit()
