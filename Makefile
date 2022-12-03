@@ -18,3 +18,7 @@ tidy:
 lint:
 	. $(VENV)/bin/activate
 	$(PYTHON) -m black . --check
+
+tests:
+	. $(VENV)/bin/activate
+	PYTHONPATH=.  $(PYTHON) test/test_env.py

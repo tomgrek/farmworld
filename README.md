@@ -10,7 +10,7 @@ pip install farmworld
 
 # Install from source
 
-```
+```shell
 make venv
 make install
 ```
@@ -26,8 +26,8 @@ poetry publish
 
 # Test
 
-```python
-PYTHONPATH=. python test/test_env.py
+```shell
+make tests
 ```
 
 # Current Status
