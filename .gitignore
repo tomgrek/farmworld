@@ -1,4 +1,5 @@
 **/*.bin
+**/*.env
 .venv
 proto
 **/__pycache__
